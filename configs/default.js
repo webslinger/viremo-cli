@@ -1,0 +1,2 @@
+const config = require('../app/config');
+module.exports = config.custom('google2','https://about.google/',[{"label":"desktop","width":1920,"height":1080,"id":0},{"label":"mobile","width":375,"height":812,"id":1}],[{"label":"homepage","path":"intl/en/","shell":true,"selectors":[{"value":".home-hero-copy"},{"value":"#carousel-placeholder"}],"actions":[0],"id":0}],[{"selector":".carousel-placeholder","event":"hover","label":"hover carousel","wait":200,"id":0}],[{"value":"header","id":0},{"value":"footer","id":1}]);

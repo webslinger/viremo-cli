@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>{title}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        div.new { display: none; }
+        div.overlay { display: none; position: relative; }
+        div.overlay img + img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0.5;
+        }
+        .switcher + .switcher {
+            display: none;
+        }
+
+        .switcher {
+            padding: 12px;
+            z-index: 0;
+            border: 1px solid black;
+        }
+        .switcher div:first-child {
+            margin-bottom: 12px;
+            text-align: right;
+        }
+        .switcher .warning {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: red;
+        }
+        .switcher button {
+            background: black;
+            color: white;
+        }
+        .switcher img {
+            max-width: 100%;
+        }
+        #tabs {
+            z-index: 1;
+            position: relative;
+            top: 1px;
+        }
+        #tabs button {
+            border: 1px solid black;
+            background: white;
+            padding: 12px;
+            font-size: 16px;
+            margin-right: 5px;
+        }
+        #tabs button.active {
+            border-bottom: 1px solid white;
+        }
+    </style>
+</head>
+<body>
+    <div id="tabs">
+        {tabs}
+    </div>
+    <div id="switchers">
+        {switchers}
+    </div>
+    <script>
+        document.querySelectorAll('#tabs button').forEach(function(button) {
+            button.addEventListener('click', function(e) {
+                var target = e.target.getAttribute('data-target-id');
+                if (target) {
+                    document.querySelectorAll('#tabs button').forEach(function(button) {
+                        button.classList.remove('active');
+                    });
+                    e.target.classList.add('active');
+                    document.querySelectorAll('.switcher').forEach(function(switcher) {
+                        switcher.style.display = "none";
+                    });
+                    document.querySelector('.switcher[data-tab-id="' + target + '"]').style.display = "block";
+                }
+            });
+        });
+        document.querySelectorAll('.switcher').forEach(function(switcher) {
+            switcher.querySelector('button.new').addEventListener('click', function() {
+                switcher.querySelector('div.reference').style.display = "none";
+                switcher.querySelector('div.overlay').style.display = "none";
+                switcher.querySelector('div.new').style.display = "block";
+            }, false);
+            switcher.querySelector('button.reference').addEventListener('click', function() {
+                switcher.querySelector('div.reference').style.display = "block";
+                switcher.querySelector('div.overlay').style.display = "none";
+                switcher.querySelector('div.new').style.display = "none";
+            }, false);
+            switcher.querySelector('button.overlay').addEventListener('click', function() {
+                switcher.querySelector('div.reference').style.display = "none";
+                switcher.querySelector('div.overlay').style.display = "block";
+                switcher.querySelector('div.new').style.display = "none";
+            }, false);
+        })
+    </script>
+</body>
+</html>
