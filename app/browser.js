@@ -87,7 +87,7 @@ exports.newPage = async (browser, viewport) => {
  */
 exports.gotoPath = async (path, page) => {
     try {
-        await page.goto(path, { waitUntil: 'networkidle0'});
+        await page.goto(path, { waitLoad: true, waitNetworkIdle: true });
     } catch (e) {
         response.errors.push(`Page Not Found: ${path}`);
         return false;
@@ -122,13 +122,9 @@ exports.confirmBaselines = (website, path, viewport, settings) => {
 
 /**
  * Performs configured events
- * @param {Action[]} actions
- * @param {string} when
- * @param {Page} page
- * @param {string} website
  * @param {string} path
- * @param {string} viewport
- * @param {Settings} settings
+ * @param {Action[]} actions
+ * @param {Page} page
  * @returns {boolean|Promise<Object>}
  */
 exports.triggerActions = (path, actions, page) => {
@@ -136,7 +132,7 @@ exports.triggerActions = (path, actions, page) => {
     return false;
   }
 
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     let count = 0;
     let response = {
       warnings: []
@@ -151,6 +147,9 @@ exports.triggerActions = (path, actions, page) => {
       }
       if (current_action) {
         waiting = true;
+        if (current_action.wait) {
+            await page.waitFor(current_action.wait);
+        }
         page[current_action.event](current_action.selector)
           .then(async () => {
             count++;
@@ -258,7 +257,10 @@ exports.process = async (website, settings, output_logs = true, ui_socket = null
     response = {
       warnings: [],
       errors: [],
-      analysis: []
+      analysis: [],
+      performance: {},
+      console: {},
+      pageErrors: {}
     };
     let browser = await puppeteer.launch({ignoreHTTPSErrors: true, headless: settings.headless});
 
@@ -274,23 +276,41 @@ exports.process = async (website, settings, output_logs = true, ui_socket = null
             /** Check each page configured */
             for (let path of website.paths) {
 
+                page.on('console', msg => {
+                    if (!response.console[path.label])
+                        response.console[path.label] = {};
+                    if (!response.console[path.label][viewport.label])
+                        response.console[path.label][viewport.label] = []
+
+                    for (let i = 0; i < msg.args().length; ++i) {
+                        response.console[path.label][viewport.label].push(`${msg.args()[i]}`);
+                    }
+                });
+                page.on('pageerror', err => {
+                    if (!response.pageErrors[path.label])
+                        response.pageErrors[path.label] = {};
+                    if (!response.pageErrors[path.label][viewport.label])
+                        response.pageErrors[path.label][viewport.label] = []
+
+                    response.pageErrors.push(err);
+                });
                 /** Confirm there are baseline images (if not in baseline mode) */
                 if (exports.confirmBaselines(website.label, path.label, viewport.label, settings) === false)
                     break viewportLoop;
 
                 /** Navigate to path */
-                detail(` -| Opening ${website.url}${path.path}`);
+                detail(`-| Opening ${website.url}${path.path}`);
                 let navigation = await exports.gotoPath(`${website.url}${path.path}`, page);
                 if (!navigation)
                     break viewportLoop;
 
                 /** Capture pre-capture events */
-                detail(`\t --| Checking for pre-screenshot events.`);
+                detail(`--| Checking for pre-screenshot events.`);
                 await exports.triggerActions(path, website.actions, page);
 
                 /** Select and capture shell elements */
                 if (path.shell === true) {
-                    detail("\t --| Capturing Shell Elements...");
+                    detail("--| Capturing Shell Elements...");
                     for (let selector of website.shell) {
                         await exports.captureSelector(selector.value, website.label, path.label, viewport.label, settings, page);
                         if (response.errors.length)
@@ -300,7 +320,7 @@ exports.process = async (website, settings, output_logs = true, ui_socket = null
 
                 /** Select and capture page elements */
                 if (path.selectors.length) {
-                    detail("\t --| Capturing Page Elements...");
+                    detail("--| Capturing Page Elements...");
                     for (let selector of path.selectors) {
                         await exports.captureSelector(selector.value, website.label, path.label, viewport.label, settings, page);
                         if (response.errors.length)
@@ -310,6 +330,20 @@ exports.process = async (website, settings, output_logs = true, ui_socket = null
 
                 /** Capture fullpage */
                 await exports.captureFullpage(website.label,path.label,viewport.label,settings,page);
+
+                /** Capture performance timings */
+                if (!response.performance[path.label])
+                    response.performance[path.label] = {};
+                    
+                response.performance[path.label][viewport.label] = await page.evaluate(() => {
+                    let navTimings = JSON.stringify(window.performance.getEntriesByType("navigation"));
+                    let resourceTimings = JSON.stringify(window.performance.getEntriesByType("resource"));
+                    return {
+                        navigation: JSON.parse(navTimings),
+                        resource: JSON.parse(resourceTimings)
+                    }
+                });
+
             }
         }
 
